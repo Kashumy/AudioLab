@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="pl" onclick="setTimeout(function(){ document.querySelector('html').requestFullscreen()});">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LABULTIMATUM DIGITAL AUDIO WORKSTATION</title>
+    <style>
+    button{
+      background: #555AA1; color:#E8EDFF; outline: none; border:none;
+    }
+    button::hover{
+      background: #717896;
+    }
+        html {
+            position: fixed; 
+            width: 100vw; 
+            height: 100vh; 
+            top: 0; 
+            left: 0;
+        }
+        canvas {
+            border: 1px solid black; 
+            touch-action: none; 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            background: #000000;
+        }
+        #playButton {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background-color: #4F527A7D;
+            color: white;
+            border: none;
+            
+            cursor: pointer;
+        }
+        #moreButton {
+          position: absolute;
+          bottom: 20px;
+          right: 100px;
+          padding: 10px 20px;
+          background-color: #4F527A7D;
+          color: white;
+          border: none;
+          
+          cursor: pointer;
+        }
+        #modal {
+            display: none;
+            position: fixed;
+            top: 50%; 
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #FFFFFF7D;
+            background: #4F527A7D;
+            border: 1px solid black;
+            padding: 20px;
+            z-index: 10;
+        }
+        #overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 5;
+        }
+        #cancelButton {
+            display: none;
+            position: absolute;
+            top: 50%;
+            width:100px;
+            height:0vh;
+            left: 50%;
+            color:#FFFFFF;
+            transform: translate(-50%, -50%);
+            padding: 100vw 100vh;
+            background-color: #4F527A9E; 
+            color: white;
+            border: none;
+            border-radius: 5px;
+            
+        }
+    </style>
+</head>
+<body>
+    <canvas id="tableCanvas"></canvas>
+    <button id="playButton">Play</button>
+    <button id="moreButton">More</button>
+    
+    <div id="overlay"></div>
+    <div id="modal">
+        <label for="bmp">tempo :</label>
+        <input type="number" id="bmp" value="460" min="50" max="600"><br>
+        <button id="okButton">OK</button>
+    </div>
+
+    <div id="cancelButton">Playing Audio</div>
+
+    <script>
+function playSound(bmp, soundType) {
+ isPlaying = false
+ 
+ if (isPlaying == true) { return; }
+ bmp1 = bmp;
+ audioContext = new(window.AudioContext || window.webkitAudioContext)();
+ audioContext.currentTime = 0
+ isPlaying = true;
+ cancelButton.style.display = 'block';
+ const beatDuration = 60 / bmp;
+ startCell = ((scrollX )) / (bmp/4)
+console.log(startCell+" :")
+ playInterval = function () {
+  const currentTime = audioContext.currentTime+startCell;
+  for (let key in cells) {
+   const [column, row] = key.split(',').map(Number);
+   if (cells[key].active) {
+    const soundStartTime = (column * beatDuration);
+    if (currentTime >= soundStartTime && currentTime < soundStartTime + beatDuration) {
+     let length1 = cells[key].width;
+     if (!playedNotes[key]) {
+      playedNotes[key] = true;
+      playNote(row, 'daw', length1, cells[key], column);
+      scrollX = column * cellWidth
+      drawTable()
+     }
+    }
+   }
+  }
+ }
+ setInterval(playInterval)
+}
+      async function playNote(row, soundType, long, cell, x, startTime) {
+    const baseFrequencies = [261.63, 277.18, 293.66, 311.13, 329.63, 349.23, 369.99, 392.00, 415.30, 440.00, 466.16, 493.88];
+const octave = Math.floor(row / 12) - 1;
+const noteIndex = row % 12;
+const frequency = baseFrequencies[noteIndex] * Math.pow(2, octave);
+const source = audioContext.createBufferSource();
+source.buffer = loadedSound[cell.section];
+source.playbackRate.value = frequency / baseFrequencies[0];
+
+const gainNode = audioContext.createGain();
+gainNode.gain.value = sectionsandsounds[cell.section].volume; 
+source.connect(gainNode);
+gainNode.connect(audioContext.destination);
+source.start(startTime);
+
+const duration = (((cellWidth)) / bmp1) + (long - cellWidth);
+
+}
+let sectionsandsounds = {
+  "0": { color: "#4F527A", sound: "./chip.mp3" ,volume:1},
+  "1": { color: "#6F926A", sound: "./hit.mp3" , volume:1},
+  "2": { color: "#94215B", sound: "./key.mp3" , volume:1},
+};
+let flashtempo=460
+let currentsection = 0;
+let loadedSound = {};
+async function loadSounds() {
+    for (const section in sectionsandsounds) {
+        const soundPath = sectionsandsounds[section].sound;
+        if(!sectionsandsounds[section].volume){
+         sectionsandsounds[section].volume=1
+        }
+        loadedSound[section] = await loadAudio(soundPath);
+    }
+}
+function changeSection(newSection) {
+    currentsection = newSection;
+    drawTable(); 
+}
+let isModalVisible = false;
+var convertedmusic = {
+};
+async function convertSoundToBase64(url) {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    const reader = new FileReader();
+    return new Promise((resolve) => {
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+    });
+}
+
+async function convertBackLOAD() {
+    
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json'; 
+    input.click(); 
+
+    input.onchange = async (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const musicData = JSON.parse(e.target.result); 
+                    await loadMusicData(musicData); 
+                } catch (error) {
+                    console.error("Błąd podczas wczytywania pliku:", error);
+                }
+            };
+            reader.readAsText(file); 
+        }
+    };
+}
+
+async function loadMusicData(musicData) {
+    
+    flashtempo = musicData.bpm;
+
+    
+    for (const noteKey in musicData.notes) {
+        const note = musicData.notes[noteKey];
+        const { startMS, hz, s } = note;
+        const noteIndex = Math.floor(startMS / (60000 / flashtempo)); 
+        const row = calculateRowFromFrequency(hz); 
+        cells[noteIndex + ',' + row] = { active: true, section: s }; 
+    }
+
+    
+    for (const section in musicData.sounds64) {
+        const soundBase64 = musicData.sounds64[section][0];
+        sectionsandsounds[section] = { sound: soundBase64, color: getRandomColor() , volume :musicData.sounds64[section][1]}; 
+    }
+    alert(JSON.stringify(cells) + " " + JSON.stringify(sectionsandsounds));
+    
+    loadSounds();
+    drawTable();
+}
+
+function calculateRowFromFrequency(frequency) {
+    const baseFrequencies = [261.63, 277.18, 293.66, 311.13, 329.63, 349.23, 369.99, 392.00, 415.30, 440.00, 466.16, 493.88];
+    const A4 = 440; 
+    const index = Math.round(12 * Math.log2(frequency / A4)); 
+    const row = index+9; 
+    return row >= 1 ? row : null; 
+}
+
+function getRandomColor() {
+    const letters = '0123456789ABCDEF';
+    let color = '#';
+    for (let i = 0; i < 6; i++) {
+        color += letters[Math.floor(Math.random() * 16)];
+    }
+    return color;
+}
+
+async function convertToMusic() {
+    const notes = {};
+    const sounds64 = {};
+    let num = 0; 
+    flashtempo = bmp1;
+    for (const key in cells) {
+        const [x, y] = key.split(',').map(Number);
+        if (cells[key].active) {
+            num += 1;
+            const soundSection = cells[key].section;
+            const frequency = calculateFrequency(y); 
+            const timeInMs = x * (60000 / flashtempo); 
+            notes["note" + num] = { startMS: timeInMs, hz: frequency, s: cells[key].section }; 
+        }
+    }
+    for (const section in loadedSound) {
+        const soundUrl = sectionsandsounds[section].sound;
+        sounds64[section] = [await convertSoundToBase64(soundUrl),sectionsandsounds[section].volume]
+    }
+    const Music = {
+        bpm: flashtempo,
+        notes,
+        sounds64,
+    };
+    return Music;
+}
+
+function calculateFrequency(row) {
+    const baseFrequencies = [261.63, 277.18, 293.66, 311.13, 329.63, 349.23, 369.99, 392.00, 415.30, 440.00, 466.16, 493.88];
+    const octave = Math.floor(row / 12); 
+    const noteIndex = row % 12;
+    return baseFrequencies[noteIndex] * Math.pow(2, octave);
+}
+
+
+document.getElementById("moreButton").addEventListener('click', moreUpdateshow);
+
+function downloadBlob(text, filename) {
+    const blob = new Blob([text], { type: 'application/json' }); 
+    const url = URL.createObjectURL(blob); 
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename; 
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+
+function moreUpdateshow() {
+    if (isModalVisible) {
+        
+        const sectionModal = document.getElementById("sectionMDL");
+        if (sectionModal) {
+            document.body.removeChild(sectionModal);
+        }
+        isModalVisible = false;
+    } else {
+        
+        isModalVisible = true;
+
+        let sectionModal = document.createElement('div');
+        sectionModal.style.position = 'fixed';
+        sectionModal.style.top = '50%';
+        sectionModal.style.left = '50%';
+        sectionModal.style.transform = 'translate(-50%, -50%)';
+        sectionModal.style.backgroundColor =  '#4F527A7D';
+        sectionModal.style.color="white"
+        sectionModal.style.padding = '20px';
+        sectionModal.style.zIndex = '20';
+        sectionModal.id = 'sectionMDL';
+        
+        let dat1 = document.createElement('div');
+        dat1.innerHTML = `<br><button id="saveButton">Save</button>
+        <button id="loadButton">Load</button> <button id="addSectionButton">change current section</button> 
+        <button id="makeSectionButton">add new key section</button> <button onclick='convertToMusic().then(music => { let text = JSON.stringify(music); downloadBlob(text,"t"); }); '>save as file</button> <button onclick='convertBackLOAD() '>load saved file </button>`;
+        
+        sectionModal.innerHTML += `
+            <label for="soundFile">Choose Sound:</label>
+            <input type="file" id="soundFile" accept="audio/*"><br>
+            <label for="noteColor">Set Note Color:</label>
+            <input type="color" id="noteColor" value="#00ff00"><br> 
+        `;
+
+        for (let i = 0; i < Object.keys(sectionsandsounds).length; i++) {
+            const button = document.createElement('button');
+            button.innerText = `Section ${i}`;
+            button.style.backgroundColor = sectionsandsounds[i].color;
+            button.onclick = () => {
+                changeSection(i);
+                document.body.removeChild(sectionModal);
+                isModalVisible = false; 
+            };
+            sectionModal.appendChild(dat1);
+            sectionModal.appendChild(button);
+        }
+        document.body.appendChild(sectionModal);
+
+        const addSection = () => {
+            const soundInput = document.getElementById('soundFile').files[0];
+            const colorInput = document.getElementById('noteColor').value;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const soundUrl = event.target.result;
+                sectionsandsounds[currentsection] = { color: colorInput, sound: soundUrl };
+                moreUpdateshow(); 
+                loadSounds();
+                drawTable();
+            };
+            if (soundInput) {
+                reader.readAsDataURL(soundInput);
+            }
+        };
+        
+        const makeSection = () => {
+            const newSectionIndex = Object.keys(sectionsandsounds).length; 
+            sectionsandsounds[newSectionIndex] = { color: "#ff0000", sound: "./key.mp3" }; 
+            loadSounds(); 
+            drawTable(); 
+            moreUpdateshow(); 
+        };
+        
+const proto1 = document.createElement('txt');
+proto1.innerHTML="Volume Current Section:"
+sectionModal.appendChild(proto1);
+
+        const volumeInput = document.createElement('input');
+    volumeInput.type = 'range';
+    volumeInput.min = 0;
+    volumeInput.max = 1;
+    volumeInput.step = 0.1;
+    volumeInput.value = sectionsandsounds[currentsection].volume; 
+    volumeInput.id = 'volumeInput';
+
+    sectionModal.appendChild(volumeInput);
+const proto2 = document.createElement('txt');
+proto2.innerHTML = `<br> selected section: ${ currentsection }`
+sectionModal.appendChild(proto2);
+
+    
+    volumeInput.addEventListener('input', () => {
+        sectionsandsounds[currentsection].volume = volumeInput.value;
+    });
+
+        
+        document.getElementById('addSectionButton').addEventListener('click', addSection);
+        document.getElementById('makeSectionButton').addEventListener('click', makeSection);
+        document.getElementById("saveButton").addEventListener('click', saveState);
+        document.getElementById("loadButton").addEventListener('click', loadState);
+    }
+}
+
+loadSounds();
+        const canvas = document.getElementById('tableCanvas');
+        const ctx = canvas.getContext('2d');
+        const playButton = document.getElementById('playButton');
+        const modal = document.getElementById('modal');
+        const overlay = document.getElementById('overlay');
+        const okButton = document.getElementById('okButton');
+        const cancelButton = document.getElementById('cancelButton');
+        const bmpInput = document.getElementById('bmp');
+        let audioContext;
+        let audioContext2;
+        let oscillator;
+        let isPlaying = false;
+        playButton.addEventListener('click', () => {
+            overlay.style.display = 'block';
+            modal.style.display = 'block';
+            
+        });
+        okButton.addEventListener('click', () => {
+            const bmp = parseInt(bmpInput.value);
+            playSound(bmp, 'sine');
+            modal.style.display = 'none';
+            overlay.style.display = 'none';
+        });
+        cancelButton.addEventListener('click', () => {
+            stopSound();
+            cancelButton.style.display = 'none';
+            overlay.style.display = 'none';
+        });
+        let playInterval;
+        let currentTime = 0;
+        let bmp1 = 460;
+        let playedNotes = {};
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        audioContext2 = new (window.AudioContext || window.webkitAudioContext)();
+
+        function stopSound() {
+            clearInterval(playInterval);
+            if (isPlaying) {
+                isPlaying = false;
+                cancelButton.style.display = 'none';
+                currentTime = 0;
+                playedNotes = {};
+                if (audioContext) {
+                    audioContext.close();
+                }
+            }
+        }
+
+
+        async function loadAudio(url) {
+            const response = await fetch(url);
+            const arrayBuffer = await response.arrayBuffer();
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            return audioBuffer;
+        }
+        const octaves = 5;
+        const rows = 12 * octaves;
+        let cellWidth = 17; 
+        const cellHeight = 18;
+        let scrollY = 0;
+        let scrollX = 0;
+        let cells = {};
+        let currentCell = null;
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            drawTable();
+        }
+        function drawKeys() {
+            const keyLabels = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+            for (let j = 0; j < rows; j++) {
+                const cellX = 0;
+                const cellY = (rows - j - 1) * cellHeight - scrollY;
+                ctx.fillStyle = keyLabels[j % 12].includes('#') ? 'rgba(40, 40, 40, 1)' : 'grey';
+                ctx.fillRect(cellX, cellY, 27, cellHeight);
+                ctx.strokeRect(cellX, cellY, 27, cellHeight);
+                ctx.fillStyle = keyLabels[j % 12].includes('#') ? 'rgba(200, 200, 200, 0.8)' : 'black';
+                ctx.fillText(`${Math.floor(j / 12)+" " }${keyLabels[j % 12]}`, cellX + 5, cellY + 12);
+            }
+        }
+        const boldlineby = 8; 
+let by5=5
+function drawTable() {
+  by5+=1
+  if(by5>0){
+    by5=0
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const startCol = Math.max(0, Math.floor(scrollX / cellWidth)) +2;
+    const endCol = startCol + Math.ceil(canvas.width / cellWidth) + 1;
+    if (scrollX < 0) { scrollX = 0; }
+    
+    for (let i = startCol; i < endCol; i++) {
+        for (let j = 0; j < rows; j++) {
+            const cellX = (i * cellWidth) - scrollX;
+            const cellY = (rows - j - 1) * cellHeight - scrollY;
+            if (cellY > canvas.height) {
+                continue;
+            }
+            ctx.fillStyle = 'rgb(10,15,10)'; 
+            ctx.fillRect(cellX, cellY, cellWidth, cellHeight);
+            ctx.strokeRect(cellX, cellY, cellWidth+1, cellHeight+1);
+        }
+
+        
+        if ((i -2 ) % boldlineby === 0) {
+            ctx.lineWidth = 2; 
+            ctx.strokeStyle = 'rgb(50,50,50)';
+            ctx.beginPath();
+            ctx.moveTo((i * cellWidth) - scrollX, 0);
+            ctx.lineTo((i * cellWidth) - scrollX, canvas.height);
+            ctx.stroke();
+            ctx.lineWidth = 0.5; 
+        }
+    }
+
+    for (let i = startCol; i < endCol; i++) {
+        for (let j = 0; j < rows; j++) {
+            const cellX = (i * cellWidth) - scrollX;
+            const cellY = (rows - j - 1) * cellHeight - scrollY;
+            if (cellY > canvas.height) {
+                continue;
+            }
+            if (cells[`${i},${j}`] && cells[`${i},${j}`].active) {
+                ctx.fillStyle = sectionsandsounds[cells[`${i},${j}`].section].color;
+                let cellWidth2 = cellWidth;
+                if (cells[`${i},${j}`] && cells[`${i},${j}`].width !== undefined) {
+                    cellWidth2 = cells[`${i},${j}`].width;
+                }
+                ctx.fillRect(cellX, cellY, cellWidth2, cellHeight);
+                ctx.strokeRect(cellX, cellY, cellWidth2, cellHeight);
+            }
+        }
+    }
+    drawKeys();
+}}
+setTimeout(function(){
+  by5=5
+  drawTable()
+},300)
+        async function playNote2(row, soundType, long, startTime) {
+    const baseFrequencies = [261.63, 277.18, 293.66, 311.13, 329.63, 349.23, 369.99, 392.00, 415.30, 440.00, 466.16, 493.88];
+    
+    const octave = Math.floor(row / 12) - 1;
+    const noteIndex = row % 12;
+    const frequency = baseFrequencies[noteIndex] * Math.pow(2, octave);
+    
+    const source = audioContext2.createBufferSource();
+    source.buffer = loadedSound[currentsection]; 
+    source.playbackRate.value = frequency / baseFrequencies[0];
+    
+    const gainNode = audioContext2.createGain();
+    source.connect(gainNode);
+    gainNode.connect(audioContext2.destination);
+    
+    source.start(startTime);
+    
+    const duration = long; 
+    if (isFinite(duration) && duration > 0) {
+        source.stop(startTime + duration); 
+    }
+}
+
+        function getCellIndex(x, y) {
+            const columnIndex = Math.floor((x + scrollX) / cellWidth);
+            const rowIndex = Math.floor(rows - (y + scrollY) / cellHeight);
+            return { column: columnIndex, row: rowIndex };
+        }
+        canvas.addEventListener('mousedown', async (e) => {
+          
+          by5=5
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const { column, row } = getCellIndex(x, y);
+    if (column >= 2 && row >= 0 && row < rows) {
+        const key = `${column},${row}`;
+        if (!cells[key]) {
+            cells[key] = { active: false };
+        }
+        cells[key].active = !cells[key].active;
+        cells[key].width = cellWidth;
+        cells[key].section = currentsection;
+        if (cells[key].active) {
+          audioContext2.currentTime=0
+            playNote2(row, 'sine', cellWidth, audioContext2.currentTime);
+        }
+        
+        drawTable();
+    }
+});
+        resizeCanvas();
+        let isDragging = false;
+        let startY = 0;
+        let startX = 0;
+        let firstX = 0;
+        canvas.addEventListener('touchstart', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.touches[0].clientX - rect.left;
+            const y = e.touches[0].clientY - rect.top;
+            const { column, row } = getCellIndex(x, y);
+            currentCell = cells[`${column},${row}`] ? `${column},${row}` : null;
+            isDragging = true;
+            startY = e.touches[0].clientY;
+            startX = e.touches[0].clientX;
+            firstX = e.touches[0].clientX;
+        });
+        canvas.addEventListener('touchmove', (e) => {
+            if (!isDragging) return;
+            const deltaY = e.touches[0].clientY - startY;
+            const deltaX =( e.touches[0].clientX - startX)*1.5;
+
+            if (currentCell) {
+                const [col, row] = currentCell.split(',').map(Number);
+                if (!cells[currentCell]) {
+                    cells[currentCell] = { active: true, width: cellWidth };
+                }
+                
+            } else {
+                scrollY -= deltaY;
+                scrollX -= deltaX;
+            }
+           if(scrollY<0){
+             scrollY=0
+           }
+            startY = e.touches[0].clientY;
+            startX = e.touches[0].clientX;
+
+            drawTable();
+            e.preventDefault();
+        });
+        canvas.addEventListener('touchend', () => {
+            isDragging = false;
+            currentCell = null;
+        });
+        window.addEventListener('resize', resizeCanvas);
+        canvas.addEventListener('wheel', (e) => {
+            scrollX += e.deltaY > 0 ? 20 : -20;
+            drawTable();
+            e.preventDefault();
+        });
+</script>
+<script>
+function initDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open("musicState", 1);
+        request.onupgradeneeded = function (event) {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains("musicState")) {
+                db.createObjectStore("musicState", { keyPath: "slot" });
+            }
+        };
+        request.onsuccess = function (event) {
+            resolve(event.target.result);
+        };
+        request.onerror = function (event) {
+            reject("Failed to open IndexedDB: " + event.target.errorCode);
+        };
+    });
+}
+async function loadState() {
+    try {
+        const db = await initDB();
+        let slot ="a"
+        const transaction = db.transaction("musicState", "readonly");
+        const store = transaction.objectStore("musicState");
+        const request = store.get(slot);
+        request.onsuccess = function(event) {
+            const gameState = event.target.result;
+            if (gameState && gameState.cells) {
+                cells = gameState.cells;
+                if(gameState.sections){
+                loadedSound = JSON.parse(gameState.sounds);
+                sectionsandsounds = gameState.sections;
+                }
+                if(gameState.tempo){
+                  bmp1=gameState.tempo
+                  bmpInput.value=gameState.tempo
+                  flashtempo=bmp1
+                }
+                drawTable()
+                loadSounds();
+            } else {
+                console.warn("No game state found for slot:", slot);
+            }
+        };
+        request.onerror = function(event) {
+            console.error("Error loading state:", event.target.error);
+        };
+    } catch (error) {
+        alert(error);
+    }
+}
+async function saveState() {
+    try {
+        const db = await initDB();
+        const transaction = db.transaction("musicState", "readwrite");
+        const store = transaction.objectStore("musicState");
+        let slot="a"
+        const musicState = { slot: slot, cells: cells , sections : sectionsandsounds , sounds: JSON.stringify(loadedSound) , tempo : bmp1  }; 
+        store.put(musicState);
+        transaction.oncomplete = function() {
+            console.log("State saved successfully.");
+        };
+        transaction.onerror = function(event) {
+            console.error("Transaction failed: ", event.target.error);
+        };
+    } catch (error) {
+        alert(error);
+    }
+}
+    </script>
+    <script>
+
+
+let WAVlength = 21869;
+let audioData = {
+  bpm: 100,
+  "notes": {
+    "note1": { "startMS": 260.8695652173913, "hz": 309.63, "s": 0 },
+    "note2": { "startMS": 1021.7391304347826, "hz": 120, "s": 0 },
+    "note3": { "startMS": 3082.608695652174, "hz": 293.88, "s": 0 },
+  },
+  "sounds64": { 
+    "0": "./chip.mp3"
+  }
+};
+
+async function downloadWAV() {
+  alert(JSON.stringify(audioData));
+  const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  const sampleRate = audioContext.sampleRate;
+
+  
+  let totalDuration = 0;
+  for (const note in audioData.notes) {
+    totalDuration = Math.max(totalDuration, audioData.notes[note].startMS);
+  }
+  const totalLength = Math.ceil(totalDuration * (sampleRate / 1000));
+
+  
+  const audioBuffer = audioContext.createBuffer(1, totalLength, sampleRate);
+  const channelData = audioBuffer.getChannelData(0);
+
+  
+  const audioFileURL = audioData.sounds64["0"];
+  let audioBufferSource;
+
+  
+  if (audioFileURL.startsWith("data:")) {
+    const response = await fetch(audioFileURL);
+    const arrayBuffer = await response.arrayBuffer();
+    audioBufferSource = await audioContext.decodeAudioData(arrayBuffer);
+  } else {
+    const response = await fetch(audioFileURL);
+    const arrayBuffer = await response.arrayBuffer();
+    audioBufferSource = await audioContext.decodeAudioData(arrayBuffer);
+  }
+
+  
+  for (const note in audioData.notes) {
+    const { startMS, hz } = audioData.notes[note];
+    const startSample = Math.floor((startMS / 1000) * sampleRate);
+    const pitchShiftFactor = Math.pow(2, (hz - 440) / 12); 
+
+    for (let i = 0; i < audioBufferSource.length; i++) {
+      const sampleIndex = startSample + Math.floor(i / pitchShiftFactor);
+      if (sampleIndex < totalLength) {
+        channelData[sampleIndex] += audioBufferSource.getChannelData(0)[i];
+      }
+    }
+  }
+
+  
+  const wavBlob = bufferToWave(audioBuffer, totalLength);
+  const url = URL.createObjectURL(wavBlob);
+
+  
+  const a = document.createElement("a");
+  a.style.display = "none";
+  a.href = url;
+  a.download = 'audio.wav';
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+}
+
+
+
+function bufferToWave(abuffer, len) {
+  const numChannels = abuffer.numberOfChannels;
+  const sampleRate = abuffer.sampleRate;
+  const format = 1; 
+  const bitDepth = 16; 
+  const byteRate = sampleRate * numChannels * (bitDepth / 8);
+  const blockAlign = numChannels * (bitDepth / 8);
+  const wavBuffer = new ArrayBuffer(44 + len * blockAlign);
+  const view = new DataView(wavBuffer);
+
+  
+  writeString(view, 0, 'RIFF');
+  view.setUint32(4, 36 + len * blockAlign, true);
+  writeString(view, 8, 'WAVE');
+  writeString(view, 12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, format, true);
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, byteRate, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, bitDepth, true);
+  writeString(view, 36, 'data');
+  view.setUint32(40, len * blockAlign, true);
+
+  
+  const offset = 44;
+  for (let i = 0; i < len; i++) {
+    for (let channel = 0; channel < numChannels; channel++) {
+      const sample = abuffer.getChannelData(channel)[i];
+      view.setInt16(offset + (i * blockAlign) + (channel * 2), sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+    }
+  }
+
+  return new Blob([wavBuffer], { type: 'audio/wav' });
+}
+
+function writeString(view, offset, string) {
+  for (let i = 0; i < string.length; i++) {
+    view.setUint8(offset + i, string.charCodeAt(i));
+  }
+}
+    </script>
+</body>
+</html>
