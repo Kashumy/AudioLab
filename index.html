@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="pl" onclick="setTimeout(function(){ document.querySelector('html').requestFullscreen()});">
 <head>
     <meta charset="UTF-8">
@@ -6,7 +6,7 @@
     <title>LABULTIMATUM DIGITAL AUDIO WORKSTATION</title>
     <style>
     button{
-      background: #555AA1; color:#E8EDFF; outline: none; border:none;
+      background: #3A3B4C; color:#9C9EA4; outline: none; border:none;
     }
     button::hover{
       background: #717896;
@@ -31,22 +31,25 @@
             bottom: 20px;
             right: 20px;
             padding: 10px 20px;
-            background-color: #4F527A7D;
+            background-color: #232020BF;
             color: white;
-            border: none;
+            border: 5px solid #252424AD;
+            border-radius: 10px;
             
-            cursor: pointer;
         }
         #moreButton {
           position: absolute;
           bottom: 20px;
           right: 100px;
           padding: 10px 20px;
-          background-color: #4F527A7D;
+          background-color: #232020BF;
           color: white;
-          border: none;
-          
-          cursor: pointer;
+          border: 5px solid #252424AD;
+border-radius: 10px;
+         
+        }
+        input{
+         background-color: #0002027D; border:none; color:#A4A7A77D;
         }
         #modal {
             display: none;
@@ -54,9 +57,9 @@
             top: 50%; 
             left: 50%;
             transform: translate(-50%, -50%);
-            color: #FFFFFF7D;
-            background: #4F527A7D;
-            border: 1px solid black;
+            color: #4051537D;
+            background: #1111117D;
+            border: 7px solid #191C1C7D;
             padding: 20px;
             z-index: 10;
         }
@@ -70,18 +73,24 @@
             background: rgba(0, 0, 0, 0.5);
             z-index: 5;
         }
+        #sectionMDL{
+         color: #6975767D;
+background-color: #1111117D;
+border: 7px solid #3A3A3A4D;
+border-radius: 50px;
+        }
         #cancelButton {
             display: none;
             position: absolute;
             top: 50%;
-            width:100px;
+            width:250px;
             height:0vh;
             left: 50%;
-            color:#FFFFFF;
+            color:#FFFFFF4F;
             transform: translate(-50%, -50%);
-            padding: 100vw 100vh;
-            background-color: #4F527A9E; 
-            color: white;
+            padding: 100vw calc( 100vh + 400px);
+            background-color: #25101942; 
+            color: #79908C52;
             border: none;
             border-radius: 5px;
             
@@ -100,9 +109,11 @@
         <button id="okButton">OK</button>
     </div>
 
-    <div id="cancelButton">Playing Audio</div>
+    <div id="cancelButton">Click to close</div>
 
     <script>
+    
+    var Dcol=0
 function playSound(bmp, soundType) {
  isPlaying = false
  
@@ -115,11 +126,14 @@ function playSound(bmp, soundType) {
  const beatDuration = 60 / bmp;
  startCell = ((scrollX )) / (bmp/4)
 console.log(startCell+" :")
- playInterval = function () {
+let playInterval2 = function () {
+  console.log("d")
+drawTable()
   const currentTime = audioContext.currentTime+startCell;
   for (let key in cells) {
    const [column, row] = key.split(',').map(Number);
    if (cells[key].active) {
+    Dcol=column
     const soundStartTime = (column * beatDuration);
     if (currentTime >= soundStartTime && currentTime < soundStartTime + beatDuration) {
      let length1 = cells[key].width;
@@ -127,14 +141,15 @@ console.log(startCell+" :")
       playedNotes[key] = true;
       playNote(row, 'daw', length1, cells[key], column);
       scrollX = column * cellWidth
-      drawTable()
+      
      }
     }
    }
   }
  }
- setInterval(playInterval)
+playInterval = setInterval(playInterval2)
 }
+
       async function playNote(row, soundType, long, cell, x, startTime) {
     const baseFrequencies = [261.63, 277.18, 293.66, 311.13, 329.63, 349.23, 369.99, 392.00, 415.30, 440.00, 466.16, 493.88];
 const octave = Math.floor(row / 12) - 1;
@@ -212,28 +227,38 @@ async function convertBackLOAD() {
 }
 
 async function loadMusicData(musicData) {
-    
     flashtempo = musicData.bpm;
 
     
+    const createdNotes = {};
+
     for (const noteKey in musicData.notes) {
         const note = musicData.notes[noteKey];
         const { startMS, hz, s } = note;
         const noteIndex = Math.floor(startMS / (60000 / flashtempo)); 
         const row = calculateRowFromFrequency(hz); 
-        cells[noteIndex + ',' + row] = { active: true, section: s }; 
+        const key = `${noteIndex},${row}`;
+        
+        if (!createdNotes[key]) {
+            cells[key] = { active: true, section: s };
+            createdNotes[key] = true;
+        } else {
+            const asyncKey = `${noteIndex}.0,${row}.0`;
+            cells[asyncKey] = { active: true, section: s };
+        }
     }
 
-    
     for (const section in musicData.sounds64) {
         const soundBase64 = musicData.sounds64[section][0];
-        sectionsandsounds[section] = { sound: soundBase64, color: getRandomColor() , volume :musicData.sounds64[section][1]}; 
+        sectionsandsounds[section] = { sound: soundBase64, color: getRandomColor(), volume: musicData.sounds64[section][1] }; 
     }
-    alert(JSON.stringify(cells) + " " + JSON.stringify(sectionsandsounds));
+    
+    
     
     loadSounds();
     drawTable();
 }
+
 
 function calculateRowFromFrequency(frequency) {
     const baseFrequencies = [261.63, 277.18, 293.66, 311.13, 329.63, 349.23, 369.99, 392.00, 415.30, 440.00, 466.16, 493.88];
@@ -261,6 +286,7 @@ async function convertToMusic() {
         const [x, y] = key.split(',').map(Number);
         if (cells[key].active) {
             num += 1;
+            
             const soundSection = cells[key].section;
             const frequency = calculateFrequency(y); 
             const timeInMs = x * (60000 / flashtempo); 
@@ -304,14 +330,12 @@ function downloadBlob(text, filename) {
 
 function moreUpdateshow() {
     if (isModalVisible) {
-        
         const sectionModal = document.getElementById("sectionMDL");
         if (sectionModal) {
             document.body.removeChild(sectionModal);
         }
         isModalVisible = false;
     } else {
-        
         isModalVisible = true;
 
         let sectionModal = document.createElement('div');
@@ -319,23 +343,25 @@ function moreUpdateshow() {
         sectionModal.style.top = '50%';
         sectionModal.style.left = '50%';
         sectionModal.style.transform = 'translate(-50%, -50%)';
-        sectionModal.style.backgroundColor =  '#4F527A7D';
-        sectionModal.style.color="white"
         sectionModal.style.padding = '20px';
         sectionModal.style.zIndex = '20';
         sectionModal.id = 'sectionMDL';
-        
+
         let dat1 = document.createElement('div');
         dat1.innerHTML = `<br><button id="saveButton">Save</button>
         <button id="loadButton">Load</button> <button id="addSectionButton">change current section</button> 
         <button id="makeSectionButton">add new key section</button> <button onclick='convertToMusic().then(music => { let text = JSON.stringify(music); downloadBlob(text,"t"); }); '>save as file</button> <button onclick='convertBackLOAD() '>load saved file </button>`;
+
         
         sectionModal.innerHTML += `
-            <label for="soundFile">Choose Sound:</label>
-            <input type="file" id="soundFile" accept="audio/*"><br>
+            <label for="soundFile" style="display: none;">Choose Sound:</label>
+            <input type="file" id="soundFile" accept="audio/*" style="display: none;">
+            <button id="chooseSoundButton">Choose Sound</button><br>
             <label for="noteColor">Set Note Color:</label>
-            <input type="color" id="noteColor" value="#00ff00"><br> 
+            <input type="color" id="noteColor" value="#00ff00"><br>
         `;
+
+        
 
         for (let i = 0; i < Object.keys(sectionsandsounds).length; i++) {
             const button = document.createElement('button');
@@ -366,7 +392,7 @@ function moreUpdateshow() {
                 reader.readAsDataURL(soundInput);
             }
         };
-        
+
         const makeSection = () => {
             const newSectionIndex = Object.keys(sectionsandsounds).length; 
             sectionsandsounds[newSectionIndex] = { color: "#ff0000", sound: "./key.mp3" }; 
@@ -374,34 +400,56 @@ function moreUpdateshow() {
             drawTable(); 
             moreUpdateshow(); 
         };
-        
-const proto1 = document.createElement('txt');
-proto1.innerHTML="Volume Current Section:"
-sectionModal.appendChild(proto1);
+
+        const proto1 = document.createElement('txt');
+        proto1.innerHTML = "Volume Current Section:";
+        sectionModal.appendChild(proto1);
 
         const volumeInput = document.createElement('input');
-    volumeInput.type = 'range';
-    volumeInput.min = 0;
-    volumeInput.max = 1;
-    volumeInput.step = 0.1;
-    volumeInput.value = sectionsandsounds[currentsection].volume; 
-    volumeInput.id = 'volumeInput';
+        volumeInput.type = 'range';
+        volumeInput.min = 0;
+        volumeInput.max = 1;
+        volumeInput.step = 0.025;
+        volumeInput.value = sectionsandsounds[currentsection].volume; 
+        volumeInput.id = 'volumeInput';
 
-    sectionModal.appendChild(volumeInput);
-const proto2 = document.createElement('txt');
-proto2.innerHTML = `<br> selected section: ${ currentsection }`
-sectionModal.appendChild(proto2);
+        sectionModal.appendChild(volumeInput);
+        const proto2 = document.createElement('txt');
+        proto2.innerHTML = `<br> selected section: ${currentsection}`;
+        sectionModal.appendChild(proto2);
 
-    
-    volumeInput.addEventListener('input', () => {
-        sectionsandsounds[currentsection].volume = volumeInput.value;
-    });
+        volumeInput.addEventListener('input', () => {
+            sectionsandsounds[currentsection].volume = volumeInput.value;
+        });
 
-        
         document.getElementById('addSectionButton').addEventListener('click', addSection);
         document.getElementById('makeSectionButton').addEventListener('click', makeSection);
         document.getElementById("saveButton").addEventListener('click', saveState);
         document.getElementById("loadButton").addEventListener('click', loadState);
+        const chooseSoundButton = document.getElementById('chooseSoundButton');
+const soundInput = document.getElementById('soundFile');
+
+
+chooseSoundButton.addEventListener('click', () => {
+ soundInput.click();
+});
+
+
+soundInput.addEventListener('change', function() {
+ const selectedFile = this.files[0];
+ if (selectedFile) {
+  const reader = new FileReader();
+  reader.onload = (event) => {
+   const soundUrl = event.target.result;
+   const colorInput = document.getElementById('noteColor').value;
+   sectionsandsounds[currentsection] = { color: colorInput, sound: soundUrl };
+   moreUpdateshow();
+   loadSounds();
+   drawTable();
+  };
+  reader.readAsDataURL(selectedFile);
+ }
+});
     }
 }
 
@@ -479,10 +527,10 @@ loadSounds();
             for (let j = 0; j < rows; j++) {
                 const cellX = 0;
                 const cellY = (rows - j - 1) * cellHeight - scrollY;
-                ctx.fillStyle = keyLabels[j % 12].includes('#') ? 'rgba(40, 40, 40, 1)' : 'grey';
+                ctx.fillStyle = keyLabels[j % 12].includes('#') ? 'rgba(20, 20, 20, 1)' : 'grey';
                 ctx.fillRect(cellX, cellY, 27, cellHeight);
                 ctx.strokeRect(cellX, cellY, 27, cellHeight);
-                ctx.fillStyle = keyLabels[j % 12].includes('#') ? 'rgba(200, 200, 200, 0.8)' : 'black';
+                ctx.fillStyle = keyLabels[j % 12].includes('#') ? 'rgba(120, 120, 120, 0.8)' : 'black';
                 ctx.fillText(`${Math.floor(j / 12)+" " }${keyLabels[j % 12]}`, cellX + 5, cellY + 12);
             }
         }
@@ -504,7 +552,7 @@ function drawTable() {
             if (cellY > canvas.height) {
                 continue;
             }
-            ctx.fillStyle = 'rgb(10,15,10)'; 
+            ctx.fillStyle = 'rgb(20,25,20)'; 
             ctx.fillRect(cellX, cellY, cellWidth, cellHeight);
             ctx.strokeRect(cellX, cellY, cellWidth+1, cellHeight+1);
         }
@@ -512,11 +560,12 @@ function drawTable() {
         
         if ((i -2 ) % boldlineby === 0) {
             ctx.lineWidth = 2; 
-            ctx.strokeStyle = 'rgb(50,50,50)';
+            ctx.strokeStyle = 'rgb(9,5,5)';
             ctx.beginPath();
             ctx.moveTo((i * cellWidth) - scrollX, 0);
             ctx.lineTo((i * cellWidth) - scrollX, canvas.height);
             ctx.stroke();
+            ctx.strokeStyle = 'rgb(50,50,50)';
             ctx.lineWidth = 0.5; 
         }
     }
@@ -528,7 +577,10 @@ function drawTable() {
             if (cellY > canvas.height) {
                 continue;
             }
-            if (cells[`${i},${j}`] && cells[`${i},${j}`].active) {
+            if ((cells[`${i},${j}`] && cells[`${i},${j}`].active)) {
+             if(cells[`${i}.0,${j}.0`]&&cells[`${i}.0,${j}.0`].active==true){
+             ctx.globalAlpha=0.5
+             }
                 ctx.fillStyle = sectionsandsounds[cells[`${i},${j}`].section].color;
                 let cellWidth2 = cellWidth;
                 if (cells[`${i},${j}`] && cells[`${i},${j}`].width !== undefined) {
@@ -536,7 +588,20 @@ function drawTable() {
                 }
                 ctx.fillRect(cellX, cellY, cellWidth2, cellHeight);
                 ctx.strokeRect(cellX, cellY, cellWidth2, cellHeight);
-            }
+                ctx.globalAlpha=1
+} if ((cells[`${i}.0,${j}.0`] && cells[`${i}.0,${j}.0`].active)) {
+ if (cells[`${i},${j}`] && cells[`${i},${j}`].active == true) {
+ ctx.globalAlpha = 0.5
+}
+ ctx.fillStyle = sectionsandsounds[cells[`${i}.0,${j}.0`].section].color;
+ let cellWidth2 = cellWidth;
+ if (cells[`${i}.0,${j}.0`] && cells[`${i}.0,${j}.0`].width !== undefined) {
+  cellWidth2 = cells[`${i}.0,${j}.0`].width;
+ }
+ ctx.fillRect(cellX, cellY, cellWidth2, cellHeight);
+ ctx.strokeRect(cellX, cellY, cellWidth2, cellHeight);
+ ctx.globalAlpha = 1
+}
         }
     }
     drawKeys();
@@ -581,11 +646,36 @@ setTimeout(function(){
     const y = e.clientY - rect.top;
     const { column, row } = getCellIndex(x, y);
     if (column >= 2 && row >= 0 && row < rows) {
-        const key = `${column},${row}`;
-        if (!cells[key]) {
+        let key = `${column},${row}`;
+        if (cells[key]&& cells[key].section !== currentsection) {
+          key = `${column}.0,${row}.0`;
+         if (!cells[key]) {
+ cells[key] = { active: false };
+}else{
+ if (cells[key]) {
+ delete cells[key];
+ drawTable();
+}
+}
+cells[key].active = !cells[key].active;
+cells[key].width = cellWidth;
+cells[key].section = currentsection;
+if (cells[key].active) {
+ audioContext2.currentTime = 0
+ playNote2(row, 'sine', cellWidth, audioContext2.currentTime);
+}
+drawTable();
+        }else{
+        if (!cells[key] ) {
             cells[key] = { active: false };
+let key2 = `${column}.0,${row}.0`;
+if (cells[key2]) {
+ delete cells[key2];
+}
         }
+        
         cells[key].active = !cells[key].active;
+        
         cells[key].width = cellWidth;
         cells[key].section = currentsection;
         if (cells[key].active) {
@@ -594,7 +684,7 @@ setTimeout(function(){
         }
         
         drawTable();
-    }
+    }}
 });
         resizeCanvas();
         let isDragging = false;
@@ -734,7 +824,7 @@ let audioData = {
 };
 
 async function downloadWAV() {
-  alert(JSON.stringify(audioData));
+  
   const audioContext = new (window.AudioContext || window.webkitAudioContext)();
   const sampleRate = audioContext.sampleRate;
 
