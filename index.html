@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LABULTIMATUM DIGITAL AUDIO WORKSTATION</title>
     <style>
-    button{
+    button{ /* Bear 🐻*/
       background: #3A3B4C; color:#9C9EA4; outline: none; border:none;
     }
     button::hover{
@@ -378,6 +378,7 @@ function moreUpdateshow() {
         document.body.appendChild(sectionModal);
 
         const addSection = () => {
+             
             const soundInput = document.getElementById('soundFile').files[0];
             const colorInput = document.getElementById('noteColor').value;
             const reader = new FileReader();
@@ -391,6 +392,10 @@ function moreUpdateshow() {
             if (soundInput) {
                 reader.readAsDataURL(soundInput);
             }
+            sectionsandsounds[currentsection].color= colorInput;
+            moreUpdateshow();
+loadSounds();
+drawTable();
         };
 
         const makeSection = () => {
@@ -806,6 +811,68 @@ async function saveState() {
         alert(error);
     }
 }
+let scrollSpeed = 0; 
+let scrollInterval; 
+const maxScrollSpeed = 10; 
+const acceleration = 1; 
+const scrollAmount = 5; 
+
+
+function scrollWASD() {
+    
+    if (keys['s']) {
+        scrollY += scrollAmount + scrollSpeed;
+    }
+    
+    if (keys['w']) {
+        scrollY -= scrollAmount + scrollSpeed;
+    }
+    
+    if (keys['d']) {
+        scrollX += scrollAmount + scrollSpeed;
+    }
+    
+    if (keys['a']) {
+        scrollX -= scrollAmount + scrollSpeed;
+    }
+
+    
+    if (scrollY < 0) {
+        scrollY = 0;
+    }
+    if (scrollX < 0) {
+        scrollX = 0;
+    }
+
+    drawTable(); 
+}
+
+
+const keys = {};
+
+ 
+document.addEventListener('keydown', (e) => {
+    keys[e.key] = true;
+    if (!scrollInterval) {
+        scrollInterval = setInterval(() => {
+            
+            if (scrollSpeed < maxScrollSpeed) {
+                scrollSpeed += acceleration;
+            }
+            scrollWASD(); 
+        }, 100); 
+    }
+});
+
+document.addEventListener('keyup', (e) => {
+    keys[e.key] = false;
+    if (keys['w'] === false && keys['a'] === false && keys['s'] === false && keys['d'] === false) {
+        clearInterval(scrollInterval);
+        scrollInterval = null;
+        scrollSpeed = 0; 
+    }
+});
+
     </script>
     <script>
 
@@ -925,7 +992,7 @@ function writeString(view, offset, string) {
   for (let i = 0; i < string.length; i++) {
     view.setUint8(offset + i, string.charCodeAt(i));
   }
-}
+} // 🍺 Beer 
     </script>
 </body>
 </html>
