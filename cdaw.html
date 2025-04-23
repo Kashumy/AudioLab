@@ -1,0 +1,599 @@
+  <!DOCTYPE html>
+<html lang="pl" ondblclick="document.documentElement.requestFullscreen()">
+ 
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Classic Digital Audio Workstation</title>
+  <meta http-equiv="content-type" content="text/html;charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    *{
+    ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  
+   user-select: none;
+  
+  }
+  input{
+    border:none;
+    outline: none;
+  }
+    html, body {
+      position: fixed;
+      width:100vw; height:100vh;
+      margin: 0;
+      padding: 0;
+      background-color: #000;
+      font-family: 'Courier New', Courier, monospace;
+      color: #0f0;
+      overflow: hidden;
+    }
+    #editorCanvas {
+      display: block;
+      background-color: #000;
+      image-rendering: pixelated;
+    }
+    #navBar {
+      position: fixed;
+      left: 0;
+      bottom: 0;
+      width: 100%;
+      background: #B915AF54;
+      border-top: 2px solid #00FF0000;
+      padding: 10px 2px;
+      text-align: center;
+      z-index: 10;
+      padding-bottom: 40px;
+      display: flex;
+      gap: 1px;
+      zoom:0.8;
+      overflow: scroll;
+    }
+    #navBar input{
+      width:80px;
+    }
+    #navBar > * {
+      margin: 3px;
+      padding: 5px 10px;
+      background: #111;
+      border: 2px solid #00FF0000;
+      color: #0f0;
+      
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+    #navBar button:hover, #navBar select:hover, #navBar input:hover, #navBar input[type="range"]:hover {
+      background: #14270D;
+      color: #9AFFA2;
+    }
+    .octaveTab {
+      margin: 0 1px;
+      padding: 3px 8px;
+      border: 2px solid #00FF0000;
+      background: #111;
+      color: #0f0;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+    .octaveTab.active {
+      background: #0f0;
+      color: #000;
+    }
+  </style>
+</head>
+<body>
+  <input type="file" id="fileInput" accept=".cdaw" style="display:none">
+
+  <canvas id="editorCanvas"></canvas>
+  <div id="navBar">
+    <button id="playBtn">Play</button>
+    <button id="stopBtn">Stop</button>
+    <button id="scrollToTop">ScrollToTop</button>
+    <button id="saveBtn">Save</button>
+    <button id="loadBtn">Load</button>
+    <button id="saveFile">SaveFile</button>
+    <button id="loadFile">LoadFile</button>
+    <span>Instr.:</span>
+    <select id="instrumentSelect">
+      <option value="sine">8: Sine</option>
+      <option value="square">8: Square</option>
+      <option value="triangle">8: Triangle</option>
+      <option value="sawtooth">8: Sawtooth</option>
+      <option value="rounded">8: Rounded</option>
+      <option value="noise">8: Noise</option>
+      
+      <option value="custom1">Adv: bass</option>
+      <option value="custom2">Adv: Short flute</option>
+      <option value="custom3">Adv: Custom3</option>
+      <option value="bmp">Mod: Bmp</option>
+      <option value="barback">Mod: Back Bars</option>
+ 
+    </select>
+    <span>Volume:</span>
+    <input type="number" value="1" max="1" min="-1" step="0.01" id="volumeInput">
+
+    <span>Shift/bpm:</span>
+    <input type="number" value="0" step="1" id="shiftInput">
+    <button id="shiftLeftBtn">Shift Left</button>
+    <button id="shiftRightBtn">Shift Right</button>
+    <span>BPM:</span>
+    <input type="number" value="120" min="1" id="bpmInput">
+    <span>Octave:</span>
+    <span id="octaveTabs"></span>
+        <span>Audio Boost:</span>
+    <input type="number" value="1" max="200" min="-200" step="0.01" id="dbInput">
+  </div>
+  <script>
+    function parseVar(value, bynum) { return Math.round(value / bynum) * bynum; }
+    var hexColor = "#000";
+    var hexColor2 = "#000";
+    var showoctaves=2;
+    let barShift=[];
+    var numColumns = 12, rowsPerSection = 64;
+    let cellWidth = window.innerWidth / numColumns;
+    let cellHeight = cellWidth;
+    let scrollY = 0, playing = false, playTimer = null, currentRow = 0;
+    let bpm = parseInt(document.getElementById("bpmInput").value);
+ 
+const rowsPerBar = 16;
+let usedBarCells = new Map();
+
+    let playInterval = (60 / bpm) / 4 * 1000;
+ 
+    const instrumentColors = { sine: "#0f0", sawtooth: "#eae", square: "#00f", triangle: "#f0f", noise: "#f00", rounded: "#efe", bmp: "#ffa500", custom1: "#faf", custom2: "#aca500" , custom3: "#b0ef00"};
+    const canvas = document.getElementById("editorCanvas");
+    const ctx = canvas.getContext("2d");
+    const octaves = []; for(let o = 1; o <= 12; o++) { octaves.push(o); }
+    let grid = {};
+    octaves.forEach(o => { 
+      grid[o] = []; 
+      for(let r = 0; r < rowsPerSection; r++) { 
+        grid[o].push(new Array(numColumns).fill(null).map(() => ({ layers: [] }))); 
+      } 
+    });
+    let currentInstrument = document.getElementById("instrumentSelect").value;
+    let currentVolume = parseFloat(document.getElementById("volumeInput").value);
+    let currentShift = parseInt(document.getElementById("shiftInput").value);
+    let currentOctave = octaves[0];
+    let lastSelectedCell = null;
+    const octaveTabs = document.getElementById("octaveTabs");
+    octaves.forEach(o => {
+      const tab = document.createElement("span");
+      tab.textContent = "O" + o;
+      tab.dataset.octave = o;
+      tab.className = "octaveTab" + (o === currentOctave ? " active" : "");
+      tab.addEventListener("click", e => {
+        currentOctave = parseInt(e.target.dataset.octave);
+        document.querySelectorAll(".octaveTab").forEach(t => t.classList.remove("active"));
+        e.target.classList.add("active");
+        drawGrid();
+      });
+      octaveTabs.appendChild(tab);
+    });
+    document.getElementById("instrumentSelect").addEventListener("change", e => { currentInstrument = e.target.value; });
+    document.getElementById("volumeInput").addEventListener("input", e => { currentVolume = parseFloat(e.target.value); });
+    document.getElementById("shiftInput").addEventListener("input", e => { currentShift = parseInt(e.target.value); });
+    document.getElementById("bpmInput").addEventListener("input", e => {
+      bpm = parseInt(e.target.value);
+      playInterval = (60 / bpm) / 4 * 1000;
+    });
+    document.getElementById("shiftLeftBtn").addEventListener("click", () => {
+      if(lastSelectedCell){
+        lastSelectedCell.layers.forEach(layer => { layer.shift = (layer.shift||0) - 1; });
+        drawGrid();
+      }
+    });
+    document.getElementById("shiftRightBtn").addEventListener("click", () => {
+      if(lastSelectedCell){
+        lastSelectedCell.layers.forEach(layer => { layer.shift = (layer.shift||0) + 1; });
+        drawGrid();
+      }
+    });
+    function hexToRgb(hex) { let bigint = parseInt(hex.slice(1), 16); return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 }; }
+    function rgbToHex(r, g, b) { return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1); }
+    function blendColors(colors) {
+      if (colors.length === 0) return "#000";
+      if (colors.length === 1) return colors[0];
+      let r = 0, g = 0, b = 0;
+      colors.forEach(c => { const { r: cr, g: cg, b: cb } = hexToRgb(c); r += cr * cr; g += cg * cg; b += cb * cb; });
+      r = Math.sqrt(r / colors.length); g = Math.sqrt(g / colors.length); b = Math.sqrt(b / colors.length);
+      return rgbToHex(Math.round(r), Math.round(g), Math.round(b));
+    }
+    function wrapText(ctx, text, maxWidth) {
+      let words = text.split(" "), lines = [], currentLine = "";
+      words.forEach(word => { 
+        let testLine = currentLine ? currentLine + " " + word : word; 
+        if(ctx.measureText(testLine).width > maxWidth && currentLine) { 
+          lines.push(currentLine); 
+          currentLine = word; 
+        } else { 
+          currentLine = testLine; 
+        } 
+      });
+      if(currentLine) lines.push(currentLine);
+      if(lines.length > 2) { 
+        let first = lines[0], second = lines.slice(1).join(" "); 
+        return [first, second]; 
+      }
+      return lines;
+    }
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      cellWidth = window.innerWidth / numColumns;
+      cellHeight = window.innerHeight / numColumns * 0.8;
+      drawGrid();
+    }
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+    canvas.addEventListener("click", e => {
+      const rect = canvas.getBoundingClientRect();
+      const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
+      const col = Math.floor(cx / cellWidth);
+      const row = Math.floor((cy + scrollY) / cellHeight);
+      if(row < 0) return;
+      if(!grid[currentOctave][row]) { 
+        grid[currentOctave][row] = new Array(numColumns).fill(null).map(() => ({ layers: [] })); 
+      }
+      let cell = grid[currentOctave][row][col];
+      lastSelectedCell = cell;
+     
+     if(cell==undefined){
+       grid[currentOctave][row][col]={ "layers":[{ instrument: currentInstrument, volume: currentVolume, shift: currentShift }] }
+       cell = { "layers":[{ instrument: currentInstrument, volume: currentVolume, shift: currentShift }] }
+     }
+  //  alert(JSON.stringify(cell))
+       
+         
+      let existing = cell.layers.find(l => l.instrument === currentInstrument);
+      if(existing){
+        cell.layers = cell.layers.filter(l => l.instrument !== currentInstrument); 
+      } else { 
+        cell.layers.push({ instrument: currentInstrument, volume: currentVolume, shift: currentShift }); 
+      }
+      drawGrid();
+    });
+    canvas.addEventListener("wheel", e => {
+      e.preventDefault();
+      scrollY += e.deltaY;
+      if(scrollY < 0) scrollY = 0;
+      drawGrid();
+    }, { passive: false });
+    let touchStartY = null;
+    canvas.addEventListener("touchstart", e => { touchStartY = e.touches[0].clientY; });
+    canvas.addEventListener("touchmove", e => {
+      if(touchStartY===null)return;
+      let delta = touchStartY - e.touches[0].clientY;
+      scrollY += delta; 
+      if(scrollY<0) scrollY=0;
+      touchStartY = e.touches[0].clientY;
+      drawGrid();
+    });
+    canvas.addEventListener("touchend", () => { touchStartY=null; });
+    const audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+
+ 
+    function playNote(octave, instrument, volume, shift, col) {
+      const baseFreq = 261.63;
+      
+      let freq = baseFreq * Math.pow(2, octave-4) * Math.pow(2, col/12);
+      dbbost=document.getElementById("dbInput").value;
+      volume=volume*dbbost
+      freq *= Math.pow(2, shift/12);
+      if(instrument==="noise"){
+        let bufferSize = audioCtx.sampleRate*0.25;
+        let buffer = audioCtx.createBuffer(1,bufferSize,audioCtx.sampleRate);
+        let data = buffer.getChannelData(0);
+        for(let i=0;i<bufferSize;i++){ data[i]=Math.random()*2-1; }
+        let noise = audioCtx.createBufferSource();
+        noise.buffer = buffer;
+        let gainNode = audioCtx.createGain();
+        gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
+        gainNode.gain.linearRampToValueAtTime(0,audioCtx.currentTime+0.25);
+        noise.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        noise.start();
+      } else if( instrument === 'custom1' ){
+  const real = new Float32Array([0, 1, 0.5, 0.25, 0.125]);
+  const imag = new Float32Array(real.length);
+  const customWave = audioCtx.createPeriodicWave(real, imag);
+  const baseFreq = 261.63;
+  let freq = baseFreq * Math.pow(2, octave - 4) * Math.pow(2, col / 12);
+  freq *= Math.pow(2, shift / 12);
+  const osc = audioCtx.createOscillator();
+  osc.setPeriodicWave(customWave);  
+  osc.frequency.value = freq;
+  const gainNode = audioCtx.createGain();
+  gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+  gainNode.gain.linearRampToValueAtTime(volume, audioCtx.currentTime + 0.01);
+  gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5);
+  osc.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.51);
+}else if (instrument === 'custom2') {
+  const real = new Float32Array([0, 1, 0, 1, 0.15]);
+  const imag = new Float32Array(real.length);
+  const customWave = audioCtx.createPeriodicWave(real, imag);
+  const baseFreq = 261.63;
+  let freq = baseFreq * Math.pow(2, octave - 4) * Math.pow(2, col / 12);
+  freq *= Math.pow(2, shift / 12);
+  const osc = audioCtx.createOscillator();
+  osc.setPeriodicWave(customWave);
+  osc.frequency.value = freq;
+  const gainNode = audioCtx.createGain();
+  gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+  gainNode.gain.linearRampToValueAtTime(volume, audioCtx.currentTime + 0.01);
+  gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.1);
+  osc.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.51);
+}else if (instrument === 'custom3') {
+  const real = new Float32Array([1, 0.9, 0.8, 0, 0.8, 0.9]);
+  const imag = new Float32Array(real.length);
+  const customWave = audioCtx.createPeriodicWave(real, imag);
+  const baseFreq = 261.63;
+  let freq = baseFreq * Math.pow(2, octave - 4) * Math.pow(2, col / 12);
+  freq *= Math.pow(2, shift / 12);
+  const osc = audioCtx.createOscillator();
+  osc.setPeriodicWave(customWave);
+  osc.frequency.value = freq;
+  const gainNode = audioCtx.createGain();
+  gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+  gainNode.gain.linearRampToValueAtTime(volume, audioCtx.currentTime + 0.01);
+  gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.2);
+  osc.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.51);
+}
+else {
+        let osc = audioCtx.createOscillator();
+        osc.type = instrument;
+        osc.frequency.value = freq;
+        let gainNode = audioCtx.createGain();
+        gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
+        gainNode.gain.linearRampToValueAtTime(0,audioCtx.currentTime+0.25);
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime+0.25);
+      }
+      volume=volume/dbbost
+    }
+    
+    function drawGrid() {
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      const section = grid[currentOctave];
+      const firstRow = Math.floor(scrollY/cellHeight);
+      const offsetY = -(scrollY%cellHeight);
+      const rowsVisible = Math.ceil(canvas.height/cellHeight)+1;
+      for(let r = firstRow; r < firstRow+rowsVisible; r++){
+        const y = offsetY + (r-firstRow)*cellHeight;
+        ctx.globalAlpha = 0;
+        ctx.strokeStyle = "#000";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0,y);
+        ctx.lineTo(canvas.width,y);
+        ctx.stroke();
+        if(!section[r]) { 
+          section[r] = new Array(numColumns).fill(null).map(() => ({ layers: [] })); 
+        }
+        for(let c=0;c<numColumns;c++){
+          const x = c*cellWidth;
+          ctx.globalAlpha = 0;
+          ctx.strokeStyle = "#000";
+          ctx.strokeRect(x,y,cellWidth,cellHeight);
+          let cell = section[r][c];
+          if(cell){
+          if(cell.layers.length>0){
+            let groups = {};
+            cell.layers.forEach(l => {
+              if(!groups[l.instrument]) groups[l.instrument]=[];
+              groups[l.instrument].push("v"+Math.round(l.volume*100) + (l.shift!==0 ? "s" + (l.shift<0 ? l.shift : l.shift) : ""));
+            });
+            let texts = [];
+            for(let instr in groups){
+              let abbr = instr.substr(0,2).toUpperCase();
+              texts.push(abbr + groups[instr].join(""));
+            }
+            let txt = texts.join(" ");
+            let lines = wrapText(ctx, txt, cellWidth-4);
+ 
+            ctx.globalAlpha = Math.min(1, (cell.layers[cell.layers.length-1].volume+0.3));
+            let col = (cell.layers.length ===1) ? (instrumentColors[cell.layers[0].instrument]||"#0a0") : "#fff";
+            ctx.globalAlpha = (Math.min(1, (cell.layers[cell.layers.length - 1].volume + 0.3)) / 4) - 0.02;
+ctx.fillStyle = col;
+ctx.fillRect(x, y, cellWidth, cellHeight);
+ctx.globalAlpha = 1;
+ctx.fillStyle = "#000";
+ctx.fillStyle = col;
+ctx.fillStyle = col;
+ctx.font = "10px Sans-Serif";
+ctx.textAlign = "center";
+ctx.textBaseline = "middle";
+            if(lines.length===1){ 
+              ctx.fillText(lines[0], x+cellWidth/2, y+cellHeight/2); 
+            } else { 
+              let lh = 10; 
+              ctx.fillText(lines[0], x+cellWidth/2, y+cellHeight/2-lh/2); 
+              ctx.fillText(lines[1], x+cellWidth/2, y+cellHeight/2+lh/2); 
+            }
+            ctx.globalAlpha = 1;
+          }
+          if(r===currentRow){
+            ctx.globalAlpha = 1;
+            ctx.strokeStyle = hexColor2;
+            ctx.lineWidth = 0.05;
+            ctx.beginPath();
+            ctx.moveTo(0,y);
+            ctx.lineTo(canvas.width,y);
+            ctx.stroke();
+          }
+        }}
+      }
+      ctx.fillStyle = "#0f0";
+      ctx.font = "12px 'Courier New', Courier, monospace";
+      ctx.textAlign = "left";
+      ctx.fillText("OCTAVE " + currentOctave,5,15);
+    }
+    
+    function playLoop() {
+      scrollY = (currentRow-5)*cellHeight; 
+      if(!playing)return;
+      Object.keys(grid).forEach(oct => {
+        let sec = grid[oct];
+        if(sec[currentRow]){
+          for(let c=0;c<numColumns;c++){
+            let cell = sec[currentRow][c];
+            if(cell){
+            if(cell.layers.length > 0){
+              cell.layers.forEach(layer => {
+const key = `${oct}-${currentRow}`;
+ 
+
+ if (layer.instrument === 'barback') {
+  if (!usedBarCells.has(key)) {
+    const reps = Math.max(1, Math.min(99, layer.volume || 1));
+    usedBarCells.set(key, reps);
+  }
+  let remaining = usedBarCells.get(key);
+  if (remaining > 0) {
+    currentRow = Math.max(0, currentRow - (layer.shift || 0) * rowsPerBar);
+    usedBarCells.set(key, remaining - 1);
+    drawGrid();
+  }
+}else{
+                if(layer.instrument === "bmp"){
+                  bpm = layer.shift; 
+                  if(bpm < 1) bpm = 1;
+                  playInterval = (60 / bpm) / 4 * 1000;
+                } else {
+                  playNote(parseInt(oct), layer.instrument, layer.volume, layer.shift || 0, c);
+                }}
+              });
+            }
+          }}
+        }
+ 
+      });scrollY = (currentRow-5)*cellHeight; 
+      currentRow++;
+      scrollY = (currentRow-5)*cellHeight; 
+      drawGrid();
+      scrollY = (currentRow-5)*cellHeight; 
+      playTimer = setTimeout(playLoop, playInterval);
+    }
+    
+    document.getElementById("playBtn").addEventListener("click", async () => {
+      usedBarCells.clear();
+      playing = false; 
+      bpm=document.getElementById("bpmInput").value 
+      playInterval = (60 / bpm) / 4 * 1000;
+      clearTimeout(playTimer);
+      await audioCtx.resume();
+      currentRow = Math.floor((scrollY)/cellHeight);
+      playing = true;
+      playLoop();
+    });
+    document.getElementById("stopBtn").addEventListener("click", () => { playing=false; clearTimeout(playTimer); });
+    document.getElementById("scrollToTop").addEventListener("click", () => { scrollY=0; drawGrid(); });
+    document.getElementById("saveFile").addEventListener("click", () => {
+  const obj = { grid, bpm, scrollY, octave: currentOctave };
+  const json = JSON.stringify(obj);
+  const encoder = new TextEncoder();
+  const bytes = encoder.encode(json);       
+  const blob = new Blob([bytes], { type: "application/octet-stream" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href     = url;
+  a.download = "project.cdaw";                         
+  a.click();
+  URL.revokeObjectURL(url);
+});
+let fileInput = document.getElementById("fileInput");
+
+document.getElementById("loadFile").addEventListener("click", () => {
+  fileInput.value = null;
+  fileInput.click();
+});
+
+fileInput.addEventListener("change", e => {
+  let file = e.target.files[0];
+  if (!file) return;
+  let reader = new FileReader();
+  reader.onload = ev => {
+    let buffer = ev.target.result;
+    let decoder = new TextDecoder();
+    let json    = decoder.decode(buffer);
+    let obj     = JSON.parse(json);
+    grid = obj.grid;
+    bpm  = obj.bpm;
+    scrollY = obj.scrollY;
+    currentOctave = obj.octave;
+    document.getElementById("bpmInput").value = bpm;
+    document.querySelectorAll(".octaveTab").forEach(t => {
+      t.classList.toggle("active", parseInt(t.dataset.octave) === currentOctave);
+    });
+    playInterval = (60 / bpm) / 4 * 1000;
+    drawGrid();
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+    document.getElementById("saveBtn").addEventListener("click", () => {
+      let data = { grid: grid, bpm: bpm, scrollY: scrollY, octave: currentOctave };
+      localStorage.setItem("lsdjMusic", JSON.stringify(data));
+    });
+    document.getElementById("loadBtn").addEventListener("click", () => {
+      let data = localStorage.getItem("lsdjMusic");
+      if(data){
+        let obj = JSON.parse(data);
+        for(let o in obj.grid){ grid[o] = obj.grid[o]; }
+        bpm = obj.bpm; 
+        document.getElementById("bpmInput").value = bpm;
+        playInterval = (60 / bpm) / 4 * 1000;
+        scrollY = obj.scrollY;
+        currentOctave = obj.octave;
+        document.querySelectorAll(".octaveTab").forEach(t => {
+          t.classList.remove("active");
+          if(parseInt(t.dataset.octave)===currentOctave) t.classList.add("active");
+        });
+        drawGrid();
+      }
+    });
+    drawGrid();
+    
+    function hslToHex(h, s, l, a) {
+      s /= 100;
+      l /= 100;
+      const k = n => (n + h / 30) % 12;
+      const a2 = a;
+      const f = n => l - a2 * Math.min(l, 1 - l) * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+      const r = Math.round(255 * f(0));
+      const g = Math.round(255 * f(8));
+      const b = Math.round(255 * f(4));
+      const toHex = x => x.toString(16).padStart(2, '0');
+      const alphaHex = Math.round(a2 * 255).toString(16).padStart(2, '0');
+      return `#${toHex(r)}${toHex(g)}${toHex(b)}${alphaHex}`;
+    }
+     
+    const navBar = document.getElementById('navBar');
+    const navBar2 = document.querySelectorAll('#navBar > *');
+    const navBar3 = document.querySelectorAll('.octaveTab');
+    function animateNavBar() {
+      const now = performance.now();
+      const hue = (now / 50) % 360;
+      hexColor = hslToHex(hue, 10, 50, 0.1);
+      hexColor3 = hslToHex(hue, 10, 10, 0.5);
+      hexColor2 = hslToHex(hue, 100, 50, 1);
+      navBar.style.backgroundColor = hexColor;
+      navBar2.forEach(function (obj){ obj.style.color = hexColor2;});
+      navBar3.forEach(function (obj){ obj.style.color = hexColor2;obj.style.background = hexColor3;});
+      requestAnimationFrame(animateNavBar);
+    }
+    animateNavBar();
+  </script>
+</body>
+</html>
